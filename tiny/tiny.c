@@ -117,7 +117,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs){
 	if(!strstr(uri, "cgi-bin")){
 		strcpy(cgiargs, "");
 		strcpy(filename, ".");
-		strcpy(filename, uri);
+		strcat(filename, uri);
 		if(uri[strlen(uri)-1] =='/')
 			strcat(filename, "home.html");
 		return 1;
@@ -151,10 +151,13 @@ void serve_static(int fd, char *filename, int filesize){
 	printf("%s", buf);
 
 	srcfd = Open(filename, O_RDONLY, 0);
-	srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+	//srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+	srcp = (char *)malloc(filesize);
+	rio_readn(srcfd, srcp, filesize);
 	Close(srcfd);
-	Rio_writen(fd, srcp, filesize);
-	Munmap(srcp, filesize);
+	rio_writen(fd, srcp, filesize);
+	//Munmap(srcp, filesize);
+	free(srcp);
 }
 
 void get_filetype(char *filename, char *filetype){
@@ -166,8 +169,8 @@ void get_filetype(char *filename, char *filetype){
 		strcpy(filetype, "image/png");
 	else if(strstr(filename, ".jpg"))
 		strcpy(filetype, "image/jepg");
-	else if(strstr(filename, ".mpg"))
-		strcpy(filetype, "video/mpeg");
+	else if(strstr(filename, ".mp4"))
+		strcpy(filetype, "video/mp4");
 	else
 		strcpy(filetype, "text/plain");
 }
