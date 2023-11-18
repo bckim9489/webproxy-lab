@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -54,10 +54,12 @@ void doit(int fd){
 	printf("Request headers:\n");
 	printf("%s", buf);
 	sscanf(buf, "%s %s %s", method, uri, version);
-	if (strcasecmp(method, "GET")){
-		clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
-		return;
+	printf("\nMethod : %s\n", method);
+	if (strcasecmp(method, "GET") != 0 && strcasecmp(method, "HEAD") != 0){
+			clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
+			return;
 	}
+
 	read_requesthdrs(&rio);
 
 	is_static = parse_uri(uri, filename, cgiargs);
@@ -71,14 +73,14 @@ void doit(int fd){
 			clienterror(fd, filename, "403", "Forbidden-static", "Tiny couldn't run the CGI program");
 			return;
 		}
-		serve_static(fd, filename, sbuf.st_size);
+		serve_static(fd, filename, sbuf.st_size, method);
 	}
 	else {
 		if(!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){
 			clienterror(fd, filename, "403", "Forbidden-dynamic", "Tiny couldn't run the CGI program");
 			return;
 		}
-		serve_dynamic(fd, filename, cgiargs);
+		serve_dynamic(fd, filename, cgiargs, method);
 	}
 }
 
@@ -136,7 +138,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs){
 	}
 }
 
-void serve_static(int fd, char *filename, int filesize){
+void serve_static(int fd, char *filename, int filesize, char *method){
 	int srcfd;
 	char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
@@ -149,15 +151,18 @@ void serve_static(int fd, char *filename, int filesize){
 	Rio_writen(fd, buf,  strlen(buf));
 	printf("Response header:\n");
 	printf("%s", buf);
-
-	srcfd = Open(filename, O_RDONLY, 0);
+	
+	//body
+	if(strcasecmp(method, "GET") == 0){
+		srcfd = Open(filename, O_RDONLY, 0);
 	//srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-	srcp = (char *)malloc(filesize);
-	rio_readn(srcfd, srcp, filesize);
-	Close(srcfd);
-	rio_writen(fd, srcp, filesize);
+		srcp = (char *)malloc(filesize);
+		rio_readn(srcfd, srcp, filesize);
+		Close(srcfd);
+		rio_writen(fd, srcp, filesize);
 	//Munmap(srcp, filesize);
-	free(srcp);
+		free(srcp);
+	}
 }
 
 void get_filetype(char *filename, char *filetype){
@@ -175,7 +180,7 @@ void get_filetype(char *filename, char *filetype){
 		strcpy(filetype, "text/plain");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs){
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method){
 	char buf[MAXLINE], *emptylist[] = {NULL};
 
 	sprintf(buf, "HTTP/1.0 200 OK\r\n");
@@ -185,6 +190,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs){
 
 	if(Fork() == 0){
 		setenv("QUERY_STRING", cgiargs, 1);
+		setenv("METHOD_TYPE", method, 1);
 		Dup2(fd, STDOUT_FILENO);
 		Execve(filename, emptylist, environ);
 	}
