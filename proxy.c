@@ -8,12 +8,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *host, char *port, char *path);
-void serve_static(int fd, char *filename, int filesize, char *method);
-void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 		char *longmsg);
-
+void *thread(void *vargp);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -21,10 +18,11 @@ static const char *user_agent_hdr =
 "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-	int listenfd, connfd;
+	int listenfd, *connfd;
 	char hostname[MAXLINE], port[MAXLINE];
 	socklen_t clientlen;
 	struct sockaddr_storage clientaddr;
+	pthread_t tid;
 
 	/* Check command line args */
 	if (argc != 2) {
@@ -35,19 +33,25 @@ int main(int argc, char **argv) {
 	listenfd = Open_listenfd(argv[1]);
 	while (1) {
 		clientlen = sizeof(clientaddr);
-		connfd = Accept(listenfd, (SA *)&clientaddr,
-				&clientlen);  // line:netp:tiny:accept
-		Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-				0);
+		connfdp = malloc(sizeof(int));
+		*connfdp = Accept(listenfd, (SA *)&clientaddr,&clientlen);  // line:netp:tiny:accept
+		Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,0);
 		printf("Accepted connection from (%s, %s)\n", hostname, port);
-		doit(connfd);   // line:netp:tiny:doit
-		Close(connfd);  // line:netp:tiny:close
+		Pthread_create(&tid, NULL, thread, connfdp);
 	}
+}
+
+void *thread(void *vargp){ //p.954 12.14
+  int connfd = *((int *)vargp);
+  Pthread_detach(pthread_self());
+  Free(vargp);
+	doit(connfd);   // line:netp:tiny:doit
+	Close(connfd);  // line:netp:tiny:close
+  return NULL;
 }
 
 void doit(int fd){
 	int target_serverfd; 
-	ssize_t n;
 	struct stat sbuf;
 	char buf[MAXLINE];
 	char buf_res[MAXLINE];
@@ -55,10 +59,9 @@ void doit(int fd){
 	//URI parse value
 	char method[MAXLINE], uri[MAXLINE], host[MAXLINE], path[MAXLINE], port[MAXLINE];
 	char filename[MAXLINE], cgiargs[MAXLINE];
-	rio_t rio_req, rio_res;
-
-	Rio_readinitb(&rio_res, fd);
-	Rio_readlineb(&rio_res, buf, MAXLINE);
+	rio_t rio;
+	Rio_readinitb(&rio, fd);
+	Rio_readlineb(&rio, buf, MAXLINE);
 	printf("Request headers:\n");
 	printf("%s", buf);
 	sscanf(buf, "%s %s %s", method, uri, version);
@@ -74,14 +77,14 @@ void doit(int fd){
 	printf("-----------------------------\n");
 /*
 	if (strcasecmp(method, "GET") != 0 && strcasecmp(method, "HEAD") != 0){
-		clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
+		//clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
 		return;
 	}
 
-	read_requesthdrs(&rio);
+	//read_requesthdrs(&rio);
 
 	if(stat(filename, &sbuf) < 0){
-		clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
+		//clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
 		return;
 	}
 */
