@@ -5,20 +5,67 @@
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 
+//---------------Proxy----------------------------
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *host, char *port, char *path);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 		char *longmsg);
+
+//--------------Thread----------------------------
 void *thread(void *vargp);
 
+//---------------Cache----------------------------
+//Hash func 1
+unsigned long djb2_hash(char *str) {
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+
+    return hash;
+}
+
+//Hash func 2
+unsigned long sdbm_hash(char *str) {
+    unsigned long hash = 0;
+    int c;
+
+    while ((c = *str++))
+        hash = c + (hash << 6) + (hash << 16) - hash;
+
+    return hash;
+}
+
+//double hashing
+unsigned int double_hashing(char *str, unsigned int table_size, unsigned int collision_cnt) {
+    unsigned long hash1 = djb2_hash(str) % table_size;
+    unsigned long hash2 = sdbm_hash(str) % table_size;
+    return (hash1 + collision_cnt * (hash2 + 1)) % table_size; // hash2 + 1 ->  always not return 0
+}
+
+//cache struct
+typedef struct {
+    char *url;        // URi
+    char *data;       // data
+    size_t size;      // data size
+} cache_entry;
+
+//hashmap
+typedef struct {
+    cache_entry **table; // hash table
+    size_t size;         // size of hash table
+} hashmap;
+
+//------------------------------------------------
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
 "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
 "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-	int listenfd, *connfd;
+	int listenfd, *connfdp;
 	char hostname[MAXLINE], port[MAXLINE];
 	socklen_t clientlen;
 	struct sockaddr_storage clientaddr;
