@@ -13,10 +13,10 @@ int main(void) {
 	if((buf = getenv("QUERY_STRING")) != NULL){
 		p1 = strchr(buf, 'a');
 		p2 = strchr(buf, 'b');
-		*p1 = '\0';
-		*p2 = '\0';
+
 		strcpy(arg1, p1+2);
 		strcpy(arg2, p2+2);
+		
 		n1 = atoi(arg1);
 		n2 = atoi(arg2);
 	}

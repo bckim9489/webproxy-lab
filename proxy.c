@@ -23,7 +23,7 @@ typedef struct {
 	time_t last_access;
 } cache_entry;
 
-//--------------hash-----------------------------
+//--------------hash 전방 수류탄-----------------------------
 //hashmap
 typedef struct {
 	cache_entry **table; // hash table
@@ -100,7 +100,7 @@ void hashmap_insert(hashmap *map, cache_entry *entry) {
 }
 
 void hashmap_lru(hashmap *map){
-	time_t oldest = time(NULL);
+	time_t oldest = time(NULL); //현재는 과거다!
 	int oldest_index = -1;
 
 	for (size_t i = 0; i < map->size; i++) {
