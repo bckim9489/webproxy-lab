@@ -16,34 +16,6 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 void *thread(void *vargp);
 
 //---------------Cache----------------------------
-//Hash func 1
-unsigned long djb2_hash(char *str) {
-    unsigned long hash = 5381;
-    int c;
-
-    while ((c = *str++))
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
-
-    return hash;
-}
-
-//Hash func 2
-unsigned long sdbm_hash(char *str) {
-    unsigned long hash = 0;
-    int c;
-
-    while ((c = *str++))
-        hash = c + (hash << 6) + (hash << 16) - hash;
-
-    return hash;
-}
-
-//double hashing
-unsigned int double_hashing(char *str, unsigned int table_size, unsigned int collision_cnt) {
-    unsigned long hash1 = djb2_hash(str) % table_size;
-    unsigned long hash2 = sdbm_hash(str) % table_size;
-    return (hash1 + collision_cnt * (hash2 + 1)) % table_size; // hash2 + 1 ->  always not return 0
-}
 
 //cache struct
 typedef struct {
@@ -51,12 +23,6 @@ typedef struct {
     char *data;       // data
     size_t size;      // data size
 } cache_entry;
-
-//hashmap
-typedef struct {
-    cache_entry **table; // hash table
-    size_t size;         // size of hash table
-} hashmap;
 
 //------------------------------------------------
 /* You won't lose style points for including this long line in your code */
