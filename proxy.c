@@ -258,8 +258,7 @@ void response(int target_fd, int fd, char* uri){
 	rio_t rio;
 	int content_length;
 
-	char *ptr, *cached_data;
-	int total_size = 0;
+	char *cached_data;
 
 	Rio_readinitb(&rio, target_fd);
 	//헤더 만들기
@@ -270,28 +269,22 @@ void response(int target_fd, int fd, char* uri){
 		Rio_writen(fd, buf, strlen(buf));
 	}
 
-	total_size = content_length;
-	cached_data = malloc(total_size);
-	ptr = cached_data;
+	cached_data = (char *)malloc(content_length);
 	
 	//바디 쏘기
-	while (total_size > 0) {
-		int bytes_read = Rio_readnb(&rio, ptr, total_size);
-		Rio_writen(fd, ptr, bytes_read);
-		ptr += bytes_read;
-		total_size -= bytes_read;
-	}
-	
+	Rio_readnb(&rio, cached_data, content_length);
+	Rio_writen(fd, cached_data, content_length);
+
 	//사이즈 작으면 캐시해줌
 	if(content_length <= MAX_OBJECT_SIZE){
 		cache_entry *new_entry = malloc(sizeof(cache_entry));
 		new_entry->url = strdup(uri);
 		new_entry->data = cached_data;
-		new_entry->size = content_length + total_size;
+		new_entry->size = content_length;
 		hashmap_insert(&cache_map, new_entry);	
 	}
 }
-
+/*
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg){
 	char buf[MAXLINE], body[MAXBUF];
 
@@ -320,7 +313,7 @@ void read_requesthdrs(rio_t *rp){
 	}
 	return;
 }
-
+*/
 int parse_uri(char *uri, char *host, char *port, char *path){
 	char *parse_ptr = strstr(uri, "//") ? strstr(uri, "//") + 2 : uri;
 
